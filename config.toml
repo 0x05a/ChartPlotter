@@ -1,0 +1,17 @@
+resolution_1 = 1000
+resolution_2 = 1000
+layers = ['LNDARE', 'SEAARE', 'DEPARE',]
+merc_scaling_size_1 = 1000
+merc_scaling_size_2 = 1000
+chart_path = "./src/charts/BYU_CHICO.000"
+top_left_1 = 30.375
+top_left_2 = -87.3
+bottom_right_1 = 30.45
+bottom_right_2 = -87.225
+
+[SEAARE]
+color = "blue"
+[LNDARE]
+color= "green"
+[DEPARE]
+color = "cyan"
