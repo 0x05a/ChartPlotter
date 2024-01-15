@@ -6,13 +6,23 @@ use sfml::window::Style;
 use log::debug;
 
 use crate::config;
-
+use crate::geometry::PlotGeometry;
 pub fn create_window() -> RenderWindow {
     debug!("Creating window");
     let resolution = config::get_resolution(); 
     let window = RenderWindow::new(resolution, "SFML window", Style::NONE, &Default::default());
     window
 
+}
+
+pub fn render_loop(window: &mut RenderWindow, plotvec: &Vec<PlotGeometry>, zoom: f32) {
+
+        window.clear(Color::BLACK);
+        // render code
+        for plotgeo in plotvec {
+            plotgeo.render(window, zoom)
+        }
+        window.display();
 }
 
 /// this function will render our triangles to the screen

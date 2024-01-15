@@ -4,10 +4,10 @@ layers = ['LNDARE', 'SEAARE', 'DEPARE',]
 merc_scaling_size_1 = 1000
 merc_scaling_size_2 = 1000
 chart_path = "./src/charts/BYU_CHICO.000"
-top_left_1 = 30.375
-top_left_2 = -87.3
-bottom_right_1 = 30.45
-bottom_right_2 = -87.225
+top_left_1 = -87.3
+top_left_2 = 30.375
+bottom_right_1 = -87.225
+bottom_right_2 = 30.45
 
 [SEAARE]
 color = "blue"

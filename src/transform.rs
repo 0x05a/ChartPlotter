@@ -1,12 +1,12 @@
 use std::f64::consts::PI;
 
-use crate::config::get_merc_scaling_size;
 
-pub fn mercator_transform(coord: (f64, f64)) -> (f64, f64)
+pub fn mercator_transform(coord: (f64, f64), scale: (u32, u32)) -> (f64, f64)
 {
     let lon = coord.0;
     let lat = coord.1;
-    let (width, height) = get_merc_scaling_size();
+    //debug!("Transforming lon: {}, lat: {}", lon, lat);
+    let (width, height) = scale;
 
     let transformed_lon = (width as f64  * (lon + 180.0) / 360.0) % (width as f64 + width as f64 / 2.0);
     let lat_rad = lat * PI / 180.0;
@@ -15,13 +15,15 @@ pub fn mercator_transform(coord: (f64, f64)) -> (f64, f64)
     (transformed_lon, transformed_lat)
 }
 
-pub fn merc_to_cartesian_coords(coord: (f64, f64), br_corner: (f64, f64), tl_corner: (f64, f64)) -> (f64, f64) {
-    let (width, height) = get_merc_scaling_size();
+pub fn merc_to_cartesian_coords(coord: (f64, f64), tl_corner: (f64, f64), br_corner: (f64, f64), scale: (u32, u32)) -> (f64, f64) {
+    let (width, height) = scale;
     let x = coord.0;
     let y = coord.1;
-
-    let transformed_br = mercator_transform(br_corner);
-    let transformed_tl = mercator_transform(tl_corner);
+    //debug!("coord: {:?}", coord);
+    //debug!("tl_corner: {:?}", tl_corner);
+    //debug!("br_corner: {:?}", br_corner);
+    let transformed_br = mercator_transform(br_corner, scale);
+    let transformed_tl = mercator_transform(tl_corner, scale);
     //debug!("Transformed BR: {:?}, Transformed TL: {:?}", transformed_br, transformed_tl);
     let max_lat = transformed_tl.1;
     let min_lat = transformed_br.1;
@@ -36,5 +38,5 @@ pub fn merc_to_cartesian_coords(coord: (f64, f64), br_corner: (f64, f64), tl_cor
     //debug!("Coordinate after mercator transform: {:?}", (merc_lon_ratio, merc_lat_ratio));
     //debug!("Coordinate after scaling by width and height: {:?}", (merc_lon_ratio * width as f64, merc_lat_ratio * height as f64));
     // our x in this case is latitude and our y is longitude
-    (merc_lat_ratio * height as f64, merc_lon_ratio * width as f64)
+    (merc_lon_ratio * width as f64, merc_lat_ratio * height as f64)
 }
