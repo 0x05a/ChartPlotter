@@ -1,4 +1,4 @@
-use sfml::graphics::{Color, RenderTarget, RenderWindow, Shape};
+use sfml::graphics::{Color, RenderTarget, RenderWindow, Shape, Transformable};
 use sfml::graphics::ConvexShape;
 use sfml::system::Vector2f;
 use sfml::window::Style;
@@ -15,18 +15,16 @@ pub fn create_window() -> RenderWindow {
 
 }
 
-pub fn render_loop(window: &mut RenderWindow, plotvec: &Vec<PlotGeometry>, zoom: f32) {
+pub fn render_poly(window: &mut RenderWindow, plotvec: &Vec<PlotGeometry>, zoom: f32) {
 
-        window.clear(Color::BLACK);
         // render code
         for plotgeo in plotvec {
             plotgeo.render(window, zoom)
         }
-        window.display();
 }
 
 /// this function will render our triangles to the screen
-pub fn draw_triangles(window: &mut RenderWindow, triangles: &Vec<geo::Triangle<f64>>, scale: f32, resolution: (u32, u32), color: Option<Color>) {
+pub fn draw_triangles(window: &mut RenderWindow, triangles: &Vec<geo::Triangle<f64>>, zoom: f32, resolution: (u32, u32), color: Option<Color>) {
     // debug!("Drawing triangles! len: {}", triangles.len());
     let c = match color {
         Some(c) => c,
@@ -50,9 +48,9 @@ pub fn draw_triangles(window: &mut RenderWindow, triangles: &Vec<geo::Triangle<f
         let p1 = (p1_0 - mid_point.0, p1_1 - mid_point.1);
         let p2 = (p2_0 - mid_point.0, p2_1 - mid_point.1);
 
-        let p0 = (p0.0 * scale, p0.1 * scale);
-        let p1 = (p1.0 * scale, p1.1 * scale);
-        let p2 = (p2.0 * scale, p2.1 * scale);
+        let p0 = (p0.0 * zoom, p0.1 * zoom);
+        let p1 = (p1.0 * zoom, p1.1 * zoom);
+        let p2 = (p2.0 * zoom, p2.1 * zoom);
 
         let p0 = (p0.0 + mid_point.0, p0.1 + mid_point.1);
         let p1 = (p1.0 + mid_point.0, p1.1 + mid_point.1);
@@ -72,4 +70,22 @@ pub fn draw_triangles(window: &mut RenderWindow, triangles: &Vec<geo::Triangle<f
         window.draw(&triangle);
     }
 
+}
+
+pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &Vec<(f64, f64, f64)>, resolution: (u32, u32), zoom: f32) {
+    let font = sfml::graphics::Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap();
+    for sounding in depth_soundings {
+        let mut text = sfml::graphics::Text::new(&format!("{:.1}", sounding.2 * 3.281), &font, 10);
+        
+        let pos = (sounding.0 as f32, sounding.1 as f32);
+        let mid_point = (resolution.0 as f32 / 2.0, resolution.1 as f32 / 2.0);
+        let pos = (pos.0 - mid_point.0, pos.1 - mid_point.1);
+        let pos = (pos.0 * zoom, pos.1 * zoom);
+        let pos = (pos.0 + mid_point.0, pos.1 + mid_point.1);
+
+        
+        text.set_position(pos);
+        text.set_fill_color(Color::WHITE);
+        window.draw(&text);
+    }
 }

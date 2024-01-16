@@ -5,7 +5,7 @@ use gdal::vector::{LayerAccess, OGRwkbGeometryType::*, Layer};
 
 
 use geo::triangulate_spade::Triangles;
-use geo::{Polygon, LineString, TriangulateEarcut, CoordsIter, scale};
+use geo::{Polygon, LineString, TriangulateEarcut, CoordsIter};
 
 use log::{debug, info, warn};
 use sfml::graphics::RenderWindow;
@@ -141,16 +141,16 @@ pub fn get_merc_polygons_from_layers(layers: &mut Vec<gdal::vector::Layer>) -> V
     polygons
 }
 
-fn get_soundg_layer(ds: & Dataset) -> Layer {
-    let mut layers = get_layers(&ds, vec!["soundg"]);
+pub fn get_soundg_layer(ds: & Dataset) -> Layer {
+    let mut layers = get_layers(&ds, vec!["SOUNDG"]);
     let layer = layers.pop().unwrap();
     layer
 }
 
-fn get_soundg_x_y(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> Vec<(f64, f64, f64)> {
+pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> Vec<(f64, f64, f64)> {
     let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
     let merc_scale = get_merc_scaling_size();
-    for mut feature in soundg_layer.features() {
+    for feature in soundg_layer.features() {
         let geometry = match feature.geometry() {
             Some(geo) => geo,
             None => {
@@ -165,11 +165,11 @@ fn get_soundg_x_y(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> 
             let new_geo = geometry.get_geometry(i);
             let new_geo_name = new_geo.geometry_name();
             match new_geo.geometry_type() {
-                wkbMultiPointZM => {
+                wkbMultiPointZM | wkbMultiPoint25D | wkbPoint25D => {
                     debug!("Matched {new_geo_name}");
                     let points = new_geo.get_point_vec();
                     for point in points {
-                        let merc_point = mercator_transform((point.1, point.0), merc_scale);
+                        let merc_point = mercator_transform((point.0, point.1), merc_scale);
                         let (x, y) = merc_to_cartesian_coords(merc_point, tl_br.0, tl_br.1, merc_scale);
                         final_points.push((x, y, point.2));
 

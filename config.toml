@@ -1,17 +1,29 @@
+# Resolution of our program
 resolution_1 = 1000
 resolution_2 = 1000
-layers = ['LNDARE', 'SEAARE', 'DEPARE',]
+
+# Scaling size for mercator - doesn't really matter
 merc_scaling_size_1 = 1000
 merc_scaling_size_2 = 1000
+
+# Chart Path
 chart_path = "./src/charts/BYU_CHICO.000"
+# Coordinates that relate to the top left and bottom right of our screen
 top_left_1 = -87.3
 top_left_2 = 30.375
 bottom_right_1 = -87.225
 bottom_right_2 = 30.45
+
+# Layer information
+# note we can map colors like color = [r, g, b] or [r, g, b, a]
+layers = ['LNDARE', 'SEAARE', 'DEPARE', 'DEPCNT']
 
 [SEAARE]
 color = "blue"
 [LNDARE]
 color= "green"
 [DEPARE]
-color = "cyan"
+color = "blue"
+[DEPCNT]
+color = 'cyan'
+

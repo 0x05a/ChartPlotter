@@ -1,7 +1,9 @@
 use std::process::exit;
 
 use env_logger;
-use geometry::{get_plotgeo_from_layer, PlotGeometry};
+
+use sfml::graphics::RenderTarget;
+use sfml::graphics::Color;
 use sfml::window::Event;
 use sfml::window::Key;
 
@@ -10,20 +12,29 @@ mod geometry;
 mod config;
 mod render;
 
-use crate::render::{create_window, render_loop};
+use geometry::{get_plotgeo_from_layer, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords};
+use config::{get_color_for_layer, get_resolution, get_layers, get_chart_path, get_init_tl_br};
+use render::{create_window, render_poly, render_soundg};
 
 fn main() {
     env_logger::init();
-    let path_str = config::get_chart_path();
-    let ds = geometry::get_dataset(&path_str[..]);
+    let path_str = get_chart_path();
+    let ds = get_dataset(&path_str[..]);
+    // get the extent from the config
+    let (top_left_extent, bottom_right_extent) = get_init_tl_br();
+    
+    // get depth layer
+    let mut soundg = get_soundg_layer(&ds);
+    let depth_soundings = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
+    // print depth soundings
+ 
+    let resolution = get_resolution();    
     // find the layer names we are interested in
-    let layer_names = config::get_layers();
+    let layer_names = get_layers();
     // get the plotgeos for each layer
     let mut plotvec: Vec<PlotGeometry> = Vec::new();
-    // get the extent from the config
-    let (top_left_extent, bottom_right_extent) = config::get_init_tl_br();
     for layer_name in layer_names {
-        let layer_color = config::get_color_for_layer(&layer_name[..]);
+        let layer_color = get_color_for_layer(&layer_name[..]);
         let mut plotgeo = get_plotgeo_from_layer(layer_name, &ds, layer_color);
         plotgeo.triangulate_and_scale(top_left_extent, bottom_right_extent);
         plotvec.push(plotgeo);
@@ -41,7 +52,10 @@ fn main() {
                     window.close();
                     exit(0);
                 }
-                Event::KeyPressed {code: Key::Escape, ..} => window.close(),
+                Event::KeyPressed {code: Key::Escape, ..} => {
+                    window.close();
+                    exit(0);
+                }
                 Event::KeyPressed { code: Key::Up, ..} => {
                     zoom += 0.1;
                 }
@@ -51,6 +65,9 @@ fn main() {
                 _ => {}
             }
         }
-    render_loop(&mut window, &plotvec, zoom);
+    window.clear(Color::BLACK);
+    render_poly(&mut window, &plotvec, zoom);
+    render_soundg(&mut window, &depth_soundings, resolution, zoom);
+    window.display();
     }
 }
