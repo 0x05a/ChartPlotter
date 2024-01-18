@@ -39,11 +39,6 @@ pub fn get_merc_scaling_size() -> (u32, u32) {
     (merc_scaling_size_1, merc_scaling_size_2)
     //   (1_000, 1_000)
 }
-pub fn get_chart_path() -> String {
-    let c = get_config();
-    c["chart_path"].as_str().unwrap().to_string()
-    //   "/home/zack/chart_plotter/rust_rewrite/chartplotter/src/charts/BYU_CHICO.000"
-}
 
 pub fn get_init_tl_br() -> ((f64, f64),(f64, f64)) {
     let c = get_config();
@@ -105,4 +100,9 @@ pub fn get_color_for_layer(layer_name: &str) -> Color {
     };
     color
     // (255, 255, 255)
+}
+
+pub fn get_chart_directory() -> String {
+    let c = get_config();
+    c["chart_directory"].as_str().unwrap().to_string()
 }

@@ -11,44 +11,47 @@ use log::{debug, info, warn};
 use sfml::graphics::RenderWindow;
 
 use crate::transform::{mercator_transform, merc_to_cartesian_coords};
-use crate::render::draw_triangles;
+use crate::render::{draw_triangles, render_soundg};
 
-use crate::config::{get_resolution, get_merc_scaling_size};
+use crate::config::get_merc_scaling_size;
 
+
+pub trait Plotable {
+    fn render(&self, window: &mut RenderWindow, zoom: f32, viewvec: (f32, f32), resolution: (u32, u32)) -> ();
+
+}
 pub struct PlotGeometry{
     pub polygons: Vec<Polygon>,
     pub triangles: Triangles<f64>,
     pub color: sfml::graphics::Color,
     pub layer_name: String,
-    pub resolution: (u32, u32),
 }
 impl PlotGeometry {
-    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String, resolution: (u32, u32)) -> PlotGeometry {
+    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String) -> PlotGeometry {
         PlotGeometry {
             polygons,
             triangles,
             color,
             layer_name,
-            resolution,
         }
     }
     pub fn triangulate_and_scale(&mut self, top_left: (f64, f64), bottom_right: (f64, f64)) {
         self.triangles = triangles_from_scaled_polygons(&self.polygons, (top_left, bottom_right));
     }
-    pub fn render(&self, window: &mut RenderWindow, zoom: f32) {
-        draw_triangles(window, &self.triangles, zoom, self.resolution, Some(self.color));
-        
+}
+
+impl Plotable for PlotGeometry {
+    fn render(&self, window: &mut RenderWindow, zoom: f32, viewvec: (f32, f32), resolution: (u32, u32)) {
+        draw_triangles(window, &self.triangles, zoom, resolution, viewvec, Some(self.color));   
     }
 }
 
-
 // creates a PlotGeometry from a layer name - still needs to be triangulated and scaled
-pub fn get_plotgeo_from_layer(layer_name: String, ds: & Dataset, color: sfml::graphics::Color) -> PlotGeometry {
+pub fn get_plotgeo_from_layer_in_dataset(layer_name: &String, ds: & Dataset, color: sfml::graphics::Color) -> PlotGeometry {
     let mut layers = get_layers(&ds, vec![&layer_name[..]]);
     let polygons = get_merc_polygons_from_layers(&mut layers);
     let triangles = Triangles::new();
-    let resolution = get_resolution();
-    PlotGeometry::new(polygons, triangles, color, layer_name, resolution)
+    PlotGeometry::new(polygons, triangles, color, layer_name.clone())
 }
 
 pub fn get_dataset(path: &str) -> Dataset {
@@ -141,13 +144,23 @@ pub fn get_merc_polygons_from_layers(layers: &mut Vec<gdal::vector::Layer>) -> V
     polygons
 }
 
+pub struct DepthLayer {
+    pub coordinates: Vec<(f64, f64, f64)>,
+}
+
+impl Plotable for DepthLayer {
+    fn render(&self, window: &mut RenderWindow, zoom: f32, _viewvec: (f32, f32), resolution: (u32, u32)) -> () {
+        render_soundg(window, self, resolution, zoom)
+    }
+    
+}
 pub fn get_soundg_layer(ds: & Dataset) -> Layer {
     let mut layers = get_layers(&ds, vec!["SOUNDG"]);
     let layer = layers.pop().unwrap();
     layer
 }
 
-pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> Vec<(f64, f64, f64)> {
+pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> DepthLayer {
     let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
     let merc_scale = get_merc_scaling_size();
     for feature in soundg_layer.features() {
@@ -181,5 +194,50 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64
             }
         }
     }
-    final_points
+    DepthLayer { coordinates: final_points } 
 } 
+
+
+
+pub fn get_extent_from_layers_in_ds(layer_names: &Vec<String>, dataset: &Dataset) -> ((f64, f64), (f64, f64)) {
+    let mut min_extent = (f64::MAX, f64::MAX);
+    let mut max_extent = (f64::MIN, f64::MIN);
+    let layer_names_str = layer_names.iter().map(|x| x as &str).collect();
+    let layers = get_layers(&dataset, layer_names_str);
+    for  mut layer in layers {
+        let layer_name = layer.name().clone();
+        debug!("Checking layer {}", layer_name);
+        for feature in layer.features()
+        {
+            let geomentry = match feature.geometry() {
+                Some(geo) => geo,
+                None => {
+                    debug!("[get_extent_from_layers] {} has no geometry!", layer_name);
+                    continue;
+                }
+            };
+            let envl = geomentry.envelope();
+            let br_corner = (envl.MaxX, envl.MaxY);
+            let tl_corner = (envl.MinX, envl.MinY);
+            //debug!("BR Corner: {:?}, TL Corner: {:?}", br_corner, tl_corner);
+            if br_corner.0 < max_extent.0 {
+                max_extent.0 = br_corner.0;
+            }
+            if br_corner.1 < max_extent.1 {
+                max_extent.1 = br_corner.1;
+            }
+            if tl_corner.0 > min_extent.0 {
+                min_extent.0 = tl_corner.0;
+            }
+            if tl_corner.1 > min_extent.1 {
+                min_extent.1 = tl_corner.1;
+            }
+
+
+        }
+
+    }
+    (min_extent, max_extent)
+
+}
+
