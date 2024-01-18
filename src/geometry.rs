@@ -206,7 +206,7 @@ pub fn get_extent_from_layers_in_ds(layer_names: &Vec<String>, dataset: &Dataset
     let layers = get_layers(&dataset, layer_names_str);
     for  mut layer in layers {
         let layer_name = layer.name().clone();
-        debug!("Checking layer {}", layer_name);
+        // debug!("Checking layer {}", layer_name);
         for feature in layer.features()
         {
             let geomentry = match feature.geometry() {
@@ -217,26 +217,27 @@ pub fn get_extent_from_layers_in_ds(layer_names: &Vec<String>, dataset: &Dataset
                 }
             };
             let envl = geomentry.envelope();
-            let br_corner = (envl.MaxX, envl.MaxY);
-            let tl_corner = (envl.MinX, envl.MinY);
-            //debug!("BR Corner: {:?}, TL Corner: {:?}", br_corner, tl_corner);
-            if br_corner.0 < max_extent.0 {
-                max_extent.0 = br_corner.0;
+            let br_corner = (envl.MinX, envl.MinY);
+            let tl_corner = (envl.MaxX, envl.MaxY);
+            // info!("BR Corner: {:?}, TL Corner: {:?}", br_corner, tl_corner);
+            if tl_corner.0 > max_extent.0 {
+                max_extent.0 = tl_corner.0;
             }
-            if br_corner.1 < max_extent.1 {
-                max_extent.1 = br_corner.1;
+            if tl_corner.1 > max_extent.1 {
+                max_extent.1 = tl_corner.1;
             }
-            if tl_corner.0 > min_extent.0 {
-                min_extent.0 = tl_corner.0;
+            if br_corner.0 < min_extent.0 {
+                min_extent.0 = br_corner.0;
             }
-            if tl_corner.1 > min_extent.1 {
-                min_extent.1 = tl_corner.1;
+            if br_corner.1 < min_extent.1 {
+                min_extent.1 = br_corner.1;
             }
 
 
         }
 
     }
+    //info!("Max extent: {:?}, Min extent: {:?}", max_extent, min_extent);
     (min_extent, max_extent)
 
 }
