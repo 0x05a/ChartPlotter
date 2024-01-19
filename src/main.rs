@@ -13,13 +13,15 @@ mod geometry;
 mod config;
 mod render;
 
-use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, Plotable, get_dataset, get_soundg_layer, get_soundg_coords, get_extent_from_layers_in_ds};
+use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords, get_extent_from_layers_in_ds};
 use config::{get_color_for_layer, get_resolution, get_layers, get_chart_directory, get_init_tl_br};
 use render::{create_window, render_objects};
 
 use gdal::Dataset;
 
 use std::fs::read_dir;
+
+use crate::geometry::DepthLayer;
 // use log::debug;
 
 fn main() {
@@ -36,12 +38,12 @@ fn main() {
     // find the layer names we are interested in
     let layer_names = get_layers();
     // get the plotgeos for each layer
-    let mut plotvec: Vec<Box<PlotGeometry>> = Vec::new();
+    let mut plotvec: Vec<PlotGeometry> = Vec::new();
     let chart_config_dir = get_chart_directory();
     let chart_dir = read_dir(chart_config_dir).unwrap();
     
-    let mut plot_refs: Vec<Box<dyn Plotable>> = Vec::new();
-    let mut depth_plots: Vec<Box<dyn Plotable>> = Vec::new();
+    let mut plot_refs: Vec<PlotGeometry> = Vec::new();
+    let depth_plots: Vec<DepthLayer> = Vec::new();
 
     let mut paths: Vec<String> = Vec::new();
 
@@ -57,7 +59,7 @@ fn main() {
     for ds in datasets {
         //let mut soundg = get_soundg_layer(&ds);
         //let depth_sounding = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
-        //depth_plots.push(Box::new(depth_sounding));
+        //depth_plots.push(epth_sounding);
         // update extent if layer's extent is smaller or larger
         let (br, tl) = get_extent_from_layers_in_ds(&layer_names, &ds);
         info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
@@ -84,7 +86,7 @@ fn main() {
         for layer_name in &layer_names {
             let layer_color = get_color_for_layer(&layer_name[..]);
             let plotgeo = get_plotgeo_from_layer_in_dataset(layer_name, &ds, layer_color);
-            plotvec.push(Box::new(plotgeo));
+            plotvec.push(plotgeo);
         }
     }
     for mut pg in plotvec {
@@ -99,9 +101,8 @@ fn main() {
     let mut zoom = 1.0 as f32;
     let zoom_scalar_x = resolution.0 as f32 / 10 as f32;
     let zoom_scalar_y = resolution.1 as f32 / 10 as f32;
-    window.set_framerate_limit(20);
     loop {
-        while let Some(event) = window.poll_event() {
+        while let Some(event) = window.wait_event() {
             match event {
                 Event::Closed => {
                     window.close();
@@ -131,10 +132,10 @@ fn main() {
                 }
                 _ => {}
             }
+        window.clear(Color::BLACK);
+        render_objects(&mut window, &plot_refs, zoom, resolution, viewvec);
+        render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
+        window.display();
         }
-    window.clear(Color::BLACK);
-    render_objects(&mut window, &plot_refs, zoom, resolution, viewvec);
-    render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
-    window.display();
     }
 }

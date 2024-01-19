@@ -17,11 +17,11 @@ pub fn create_window() -> RenderWindow {
 
 }
 
-pub fn render_objects(window: &mut RenderWindow, plotvec: &Vec<Box<dyn Plotable>>, zoom: f32, resolution: (u32, u32), viewvec: (f32, f32)) {
+pub fn render_objects<T: Plotable>(window: &mut RenderWindow, plotvec: &Vec<T>, zoom: f32, resolution: (u32, u32), viewvec: (f32, f32)) {
 
         // render code
         for plot in plotvec {
-            plot.render(window, zoom.abs(), viewvec, resolution)
+            plot.render(window, zoom, viewvec, resolution)
         }
 }
 
