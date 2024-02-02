@@ -83,16 +83,16 @@ pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>) {
 }
 
 
-pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer, resolution: (u32, u32), zoom: f32, font: &SfBox<Font>) {
+pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer,  font: &SfBox<Font>) {
     for sounding in &depth_soundings.coordinates {
-        let mut text = sfml::graphics::Text::new(&format!("{:.1}", sounding.2 * 3.281), &font, 10);
+        let mut text = sfml::graphics::Text::new(&format!("{:.1}", sounding.2 * 3.281), &font, 8);
         
         //let pos = (sounding.0 as f32, sounding.1 as f32);
         //let mid_point = (resolution.0 as f32 / 2.0, resolution.1 as f32 / 2.0);
         //let pos = (pos.0 - mid_point.0, pos.1 - mid_point.1);
         //let pos = (pos.0 * zoom, pos.1 * zoom);
         //let pos = (pos.0 + mid_point.0, pos.1 + mid_point.1);
-        let pos = dbg!((sounding.0 as f32, sounding.1 as f32));
+        let pos = (sounding.0 as f32, sounding.1 as f32);
         
         text.set_position(pos);
         text.set_fill_color(Color::WHITE);

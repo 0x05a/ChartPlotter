@@ -47,6 +47,7 @@ fn main() {
     
     let mut plot_refs: Vec<PlotGeometry> = Vec::new();
     let mut depth_plots: Vec<DepthLayer> = Vec::new();
+    let mut projections: Vec<DepthLayer> = Vec::new();
 
     let mut paths: Vec<String> = Vec::new();
 
@@ -61,7 +62,7 @@ fn main() {
     let datasets: Vec<Dataset> = paths.iter().map(|path| get_dataset(path)).collect();
     for ds in datasets {
         let mut soundg = get_soundg_layer(&ds);
-        let depth_sounding = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
+        let depth_sounding = get_soundg_coords(&mut soundg);
         depth_plots.push(depth_sounding);
         // update extent if layer's extent is smaller or larger
         let (br, tl) = get_extent_from_layers_in_ds(&layer_names, &ds);
@@ -95,6 +96,10 @@ fn main() {
     for mut pg in plotvec {
     pg.triangulate_and_scale(top_left_extent, bottom_right_extent);
     plot_refs.push(pg);
+    }
+    for mut ds in depth_plots {
+        ds.project_coords((top_left_extent, bottom_right_extent));
+        projections.push(ds);
     }
     //plot_refs.push(&soundg;
     // set up window and zoom
@@ -155,7 +160,7 @@ fn main() {
         render_objects(&mut window, &plot_refs, zoom, resolution, viewvec);
         
         if render_depth {
-            render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
+            render_objects(&mut window, &projections, zoom, resolution, viewvec);
         }
         window.display();
         }

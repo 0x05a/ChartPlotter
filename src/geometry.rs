@@ -180,9 +180,25 @@ pub struct DepthLayer {
     pub font: sfml::SfBox<Font>
 }
 
+impl DepthLayer {
+    pub fn new(coordinates: Vec<(f64, f64, f64)>, font: sfml::SfBox<Font>) -> DepthLayer {
+        DepthLayer { coordinates, font }
+    }
+    pub fn project_coords(&mut self, tl_br: ((f64, f64), (f64, f64))) {
+        let merc_scale = get_merc_scaling_size();
+        let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
+        for point in &self.coordinates {
+            let merc_point = mercator_transform((point.0, point.1), merc_scale);
+            let (x, y) = merc_to_cartesian_coords(merc_point, tl_br.0, tl_br.1, merc_scale);
+            final_points.push((x, y, point.2));
+        }
+        self.coordinates = final_points;
+    }
+}
+
 impl Plotable for DepthLayer {
-    fn render(&self, window: &mut RenderWindow, zoom: f32, _viewvec: (f32, f32), resolution: (u32, u32)) -> () {
-        render_soundg(window, self, resolution, zoom, &self.font)
+    fn render(&self, window: &mut RenderWindow, _: f32, _viewvec: (f32, f32), _: (u32, u32)) -> () {
+        render_soundg(window, self, &self.font)
     }
     
 }
@@ -192,9 +208,8 @@ pub fn get_soundg_layer(ds: & Dataset) -> Layer {
     layer
 }
 
-pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64))) -> DepthLayer {
+pub fn get_soundg_coords(soundg_layer: &mut Layer) -> DepthLayer {
     let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
-    let merc_scale = get_merc_scaling_size();
     for feature in soundg_layer.features() {
         let geometry = match feature.geometry() {
             Some(geo) => geo,
@@ -212,9 +227,9 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64
                 wkbMultiPointZM | wkbMultiPoint25D | wkbPoint25D => {
                     let points = new_geo.get_point_vec();
                     for point in points {
-                        let merc_point = mercator_transform((point.0, point.1), merc_scale);
-                        let (x, y) = merc_to_cartesian_coords(merc_point, tl_br.0, tl_br.1, merc_scale);
-                        final_points.push((x, y, point.2));
+                        //let merc_point = mercator_transform((point.0, point.1), merc_scale);
+                        //let (x, y) = merc_to_cartesian_coords(merc_point, tl_br.0, tl_br.1, merc_scale);
+                        final_points.push((point.0, point.1, point.2));
 
                     }
                 }, 
@@ -226,6 +241,8 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64
     }
     DepthLayer { coordinates: final_points, font: get_default_font() } 
 } 
+
+
 
 pub fn get_default_font() -> sfml::SfBox<Font> {
     Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap() 
