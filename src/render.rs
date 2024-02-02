@@ -1,9 +1,10 @@
-use sfml::graphics::{Color, RenderTarget, RenderWindow, Shape, Transformable};
+use sfml::graphics::{Color, Drawable, Font, PrimitiveType, RenderStates, RenderTarget, RenderWindow, Shape, Transformable, Vertex, VertexBuffer};
 use sfml::graphics::ConvexShape;
 use sfml::system::Vector2f;
 use sfml::window::Style;
 
-use log::debug;
+use log::{debug, info};
+use sfml::SfBox;
 
 use crate::config;
 use crate::geometry::{Plotable, DepthLayer};
@@ -71,18 +72,27 @@ pub fn draw_triangles(window: &mut RenderWindow, triangles: &Vec<geo::Triangle<f
 
 }
 
+pub fn draw_vertex_buffer(window: &mut RenderWindow, vertex_buffer: &VertexBuffer) {
+    info!("Drawing {} Vertices!", vertex_buffer.vertex_count());
+    window.draw(vertex_buffer);
+}
 
-pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer, resolution: (u32, u32), zoom: f32) {
-    let font = sfml::graphics::Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap();
+pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>) {
+    window.draw_primitives(vertices, PrimitiveType::TRIANGLES, &RenderStates::default());
+
+}
+
+
+pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer, resolution: (u32, u32), zoom: f32, font: &SfBox<Font>) {
     for sounding in &depth_soundings.coordinates {
         let mut text = sfml::graphics::Text::new(&format!("{:.1}", sounding.2 * 3.281), &font, 10);
         
-        let pos = (sounding.0 as f32, sounding.1 as f32);
-        let mid_point = (resolution.0 as f32 / 2.0, resolution.1 as f32 / 2.0);
-        let pos = (pos.0 - mid_point.0, pos.1 - mid_point.1);
-        let pos = (pos.0 * zoom, pos.1 * zoom);
-        let pos = (pos.0 + mid_point.0, pos.1 + mid_point.1);
-
+        //let pos = (sounding.0 as f32, sounding.1 as f32);
+        //let mid_point = (resolution.0 as f32 / 2.0, resolution.1 as f32 / 2.0);
+        //let pos = (pos.0 - mid_point.0, pos.1 - mid_point.1);
+        //let pos = (pos.0 * zoom, pos.1 * zoom);
+        //let pos = (pos.0 + mid_point.0, pos.1 + mid_point.1);
+        let pos = dbg!((sounding.0 as f32, sounding.1 as f32));
         
         text.set_position(pos);
         text.set_fill_color(Color::WHITE);

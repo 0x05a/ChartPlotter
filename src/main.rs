@@ -1,10 +1,14 @@
+use std::borrow::Borrow;
+use std::borrow::BorrowMut;
 use std::process::exit;
 
 use env_logger;
 
 use log::info;
+use log::log;
 use sfml::graphics::RenderTarget;
 use sfml::graphics::Color;
+use sfml::graphics::View;
 use sfml::window::Event;
 use sfml::window::Key;
 
@@ -20,7 +24,6 @@ use render::{create_window, render_objects};
 use gdal::Dataset;
 
 use std::fs::read_dir;
-
 use crate::geometry::DepthLayer;
 // use log::debug;
 
@@ -43,7 +46,7 @@ fn main() {
     let chart_dir = read_dir(chart_config_dir).unwrap();
     
     let mut plot_refs: Vec<PlotGeometry> = Vec::new();
-    let depth_plots: Vec<DepthLayer> = Vec::new();
+    let mut depth_plots: Vec<DepthLayer> = Vec::new();
 
     let mut paths: Vec<String> = Vec::new();
 
@@ -57,9 +60,9 @@ fn main() {
     }
     let datasets: Vec<Dataset> = paths.iter().map(|path| get_dataset(path)).collect();
     for ds in datasets {
-        //let mut soundg = get_soundg_layer(&ds);
-        //let depth_sounding = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
-        //depth_plots.push(epth_sounding);
+        let mut soundg = get_soundg_layer(&ds);
+        let depth_sounding = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
+        depth_plots.push(depth_sounding);
         // update extent if layer's extent is smaller or larger
         let (br, tl) = get_extent_from_layers_in_ds(&layer_names, &ds);
         info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
@@ -98,9 +101,15 @@ fn main() {
     println!("Creating Window!");
     let mut viewvec = (0.0 as f32, 0.0 as f32);
     let mut window = create_window();
+    let mut view = View::new((resolution.0 as f32 / 2 as f32, resolution.1 as f32 / 2 as f32).into(), (resolution.0 as f32, resolution.1 as f32).into());
+    window.set_view(&view);
+    window.set_framerate_limit(60);
     let mut zoom = 1.0 as f32;
-    let zoom_scalar_x = resolution.0 as f32 / 10 as f32;
-    let zoom_scalar_y = resolution.1 as f32 / 10 as f32;
+    let res_x = resolution.0 as f32;
+    let res_y = resolution.1 as f32;
+    
+    let mut render_depth = false;
+
     loop {
         while let Some(event) = window.wait_event() {
             match event {
@@ -112,29 +121,42 @@ fn main() {
                     window.close();
                     exit(0);
                 }
+                Event::KeyPressed { code: Key::Q, ..} => {
+                    window.close();
+                    exit(0);
+                }
                 Event::KeyPressed { code: Key::Up, ..} => {
-                    viewvec.1 += 1 as f32 / zoom as f32 * zoom_scalar_y;
+                    view.move_((0 as f32, -0.1 * res_y * zoom as f32 ));
                 }
                 Event::KeyPressed { code: Key::Down, ..} => {
-                    viewvec.1 -= 1 as f32 / zoom as f32 * zoom_scalar_y;
+                    view.move_((0 as f32, 0.1  * res_y * zoom as f32 ));
                 }
                 Event::KeyPressed { code: Key::Left, ..} => {
-                    viewvec.0 += 1 as f32 / zoom as f32 * zoom_scalar_x;
+                    view.move_((-0.1 * (res_x * zoom) as f32, 0 as f32));
                 }
                 Event::KeyPressed { code: Key::Right, ..} => {
-                    viewvec.0 -= 1 as f32 / zoom as f32 * zoom_scalar_x;
+                    view.move_((0.1 * (res_x * zoom) as f32 , 0 as f32));
                 }
                 Event::KeyPressed { code: Key::W, ..} => {
-                    zoom *= 1.1;
+                    zoom *= 0.9;
+                    view.zoom(0.9);
                 }
                 Event::KeyPressed { code: Key::S, ..} => {
-                    zoom *= 0.9;
+                    zoom *= 1.1;
+                    view.zoom(1.1);
+                }
+                Event::KeyPressed { code: Key::D, ..} => {
+                    render_depth = !render_depth;
                 }
                 _ => {}
             }
+        window.set_view(&view);
         window.clear(Color::BLACK);
         render_objects(&mut window, &plot_refs, zoom, resolution, viewvec);
-        render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
+        
+        if render_depth {
+            render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
+        }
         window.display();
         }
     }

@@ -8,10 +8,12 @@ use geo::triangulate_spade::Triangles;
 use geo::{Polygon, LineString, TriangulateEarcut, CoordsIter};
 
 use log::{debug, info, warn};
-use sfml::graphics::RenderWindow;
+use sfml::graphics::{Font, RenderWindow};
+use sfml::graphics::{VertexBuffer, Vertex, PrimitiveType, Color, VertexBufferUsage};
+use sfml::system::{Vector2, Vector2f};
 
 use crate::transform::{mercator_transform, merc_to_cartesian_coords};
-use crate::render::{draw_triangles, render_soundg};
+use crate::render::{draw_triangles, draw_vertex_buffer, draw_vertex_vector, render_soundg};
 
 use crate::config::get_merc_scaling_size;
 
@@ -25,24 +27,53 @@ pub struct PlotGeometry{
     pub triangles: Triangles<f64>,
     pub color: sfml::graphics::Color,
     pub layer_name: String,
+    pub vertex_vec: Vec<Vertex>,
+    pub vertex_buff: VertexBuffer
 }
 impl PlotGeometry {
-    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String) -> PlotGeometry {
+    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String, vertex_vec: Vec<Vertex>, vertex_buff: VertexBuffer) -> PlotGeometry {
         PlotGeometry {
             polygons,
             triangles,
             color,
             layer_name,
+            vertex_vec,
+            vertex_buff,
         }
     }
     pub fn triangulate_and_scale(&mut self, top_left: (f64, f64), bottom_right: (f64, f64)) {
         self.triangles = triangles_from_scaled_polygons(&self.polygons, (top_left, bottom_right));
+        let mut vertex_buffer = VertexBuffer::new(PrimitiveType::TRIANGLES, self.triangles.len() as u32 * 3 as u32, VertexBufferUsage::STATIC);
+        let mut vertex_vec: Vec<Vertex> = Vec::new();
+        for  triangle in self.triangles.iter() {
+            //vertex_vec[idx].position   = Vector2f::new(triangle.0.x as f32, triangle.0.y as f32);
+            //vertex_vec[idx+1].position = Vector2f::new(triangle.1.x as f32, triangle.1.y as f32);
+            //vertex_vec[idx+2].position = Vector2f::new(triangle.2.x as f32, triangle.2.y as f32);
+            vertex_vec.push(Vertex::with_pos_color((triangle.0.x as f32, triangle.0.y as f32).into(), self.color));
+            vertex_vec.push(Vertex::with_pos_color((triangle.1.x as f32, triangle.1.y as f32).into(), self.color));
+            vertex_vec.push(Vertex::with_pos_color((triangle.2.x as f32, triangle.2.y as f32).into(), self.color));
+        }
+
+        // dbg!(&vertex_vec);
+        assert!(vertex_vec.len() / 3 == self.triangles.len());
+        let good_update = vertex_buffer.update(&self.vertex_vec.as_slice(), 0);
+        if !good_update {
+            info!("Could not update vertex buffer!!!!")
+        }
+        else {
+            info!("Updated vertex buffer!!!")
+        }
+        debug!("Created vertex buffer with {} vertices on {} triangles", vertex_buffer.vertex_count(), self.triangles.len());
+        self.vertex_buff = vertex_buffer;
+        self.vertex_vec = vertex_vec;
     }
 }
 
 impl Plotable for PlotGeometry {
     fn render(&self, window: &mut RenderWindow, zoom: f32, viewvec: (f32, f32), resolution: (u32, u32)) {
-        draw_triangles(window, &self.triangles, zoom, resolution, viewvec, Some(self.color));   
+        //draw_triangles(window, &self.triangles, zoom, resolution, viewvec, Some(self.color));
+        //draw_vertex_buffer(window, &self.vertex_buff);
+        draw_vertex_vector(window, &self.vertex_vec)
     }
 }
 
@@ -51,7 +82,7 @@ pub fn get_plotgeo_from_layer_in_dataset(layer_name: &String, ds: & Dataset, col
     let mut layers = get_layers(&ds, vec![&layer_name[..]]);
     let polygons = get_merc_polygons_from_layers(&mut layers);
     let triangles = Triangles::new();
-    PlotGeometry::new(polygons, triangles, color, layer_name.clone())
+    PlotGeometry::new(polygons, triangles, color, layer_name.clone(), Vec::new(), VertexBuffer::new(PrimitiveType::TRIANGLES, 0, VertexBufferUsage::DYNAMIC))
 }
 
 pub fn get_dataset(path: &str) -> Dataset {
@@ -146,11 +177,12 @@ pub fn get_merc_polygons_from_layers(layers: &mut Vec<gdal::vector::Layer>) -> V
 
 pub struct DepthLayer {
     pub coordinates: Vec<(f64, f64, f64)>,
+    pub font: sfml::SfBox<Font>
 }
 
 impl Plotable for DepthLayer {
     fn render(&self, window: &mut RenderWindow, zoom: f32, _viewvec: (f32, f32), resolution: (u32, u32)) -> () {
-        render_soundg(window, self, resolution, zoom)
+        render_soundg(window, self, resolution, zoom, &self.font)
     }
     
 }
@@ -176,10 +208,8 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64
         debug!("soundg has {} geometries", geo_count);
         for i in 0..geo_count{
             let new_geo = geometry.get_geometry(i);
-            let new_geo_name = new_geo.geometry_name();
             match new_geo.geometry_type() {
                 wkbMultiPointZM | wkbMultiPoint25D | wkbPoint25D => {
-                    debug!("Matched {new_geo_name}");
                     let points = new_geo.get_point_vec();
                     for point in points {
                         let merc_point = mercator_transform((point.0, point.1), merc_scale);
@@ -194,10 +224,12 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer, tl_br: ((f64, f64), (f64, f64
             }
         }
     }
-    DepthLayer { coordinates: final_points } 
+    DepthLayer { coordinates: final_points, font: get_default_font() } 
 } 
 
-
+pub fn get_default_font() -> sfml::SfBox<Font> {
+    Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap() 
+}
 
 pub fn get_extent_from_layers_in_ds(layer_names: &Vec<String>, dataset: &Dataset) -> ((f64, f64), (f64, f64)) {
     let mut min_extent = (f64::MAX, f64::MAX);
