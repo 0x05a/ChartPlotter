@@ -18,14 +18,17 @@ bottom_right_2 = 30.1
 # Layer information
 # note we can map colors like color = [r, g, b] or [r, g, b, a]
 layers = ['LNDARE', 'SEAARE', 'DEPARE']
+#layers = ['DEPARE']
 #layers = ['SEAARE']
 
 [SEAARE]
-color = "blue"
+color = [115,182,239]
 [LNDARE]
-color= "green"
+color= [201,185,122]
 [DEPARE]
-color = "blue"
+#color = "blue"
+color = [115,182,239]
 [DEPCNT]
-color = 'cyan'
+color = [212,234,238,255]
+#color = 'cyan'
 

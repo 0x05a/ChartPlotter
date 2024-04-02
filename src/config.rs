@@ -40,17 +40,6 @@ pub fn get_merc_scaling_size() -> (u32, u32) {
     //   (1_000, 1_000)
 }
 
-pub fn get_init_tl_br() -> ((f64, f64),(f64, f64)) {
-    let c = get_config();
-    let top_left_1 = c["top_left_1"].as_float().unwrap();
-    let top_left_2 = c["top_left_2"].as_float().unwrap();
-    let bottom_right_1 = c["bottom_right_1"].as_float().unwrap();
-    let bottom_right_2 = c["bottom_right_2"].as_float().unwrap();
-    ((top_left_1, top_left_2), (bottom_right_1, bottom_right_2))
-//    ((30.375, -87.3 ), (30.45, -87.225))
-}
-
-
 pub fn get_color_for_layer(layer_name: &str) -> Color {
     let c = get_config();
     let layer_table = c[layer_name].as_table().unwrap();
