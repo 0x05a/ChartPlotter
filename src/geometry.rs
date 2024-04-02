@@ -57,6 +57,14 @@ impl Plotable for PlotGeometry {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct LayerExtent {
+    pub MinX: f32,
+    pub MaxX: f32,
+    pub MinY: f32,
+    pub MaxY: f32,
+}
+
 // creates a PlotGeometry from a layer name - still needs to be triangulated and scaled
 pub fn get_plotgeo_from_layer_in_dataset(layer_name: &String, ds: & Dataset, color: sfml::graphics::Color) -> PlotGeometry {
     let mut layers = get_layers(&ds, vec![&layer_name[..]]);
@@ -174,6 +182,7 @@ pub fn get_depare_from_layer(layer: &mut gdal::vector::Layer) -> DEPARE {
     let merc_scale = get_merc_scaling_size();
     let layer_name = layer.name().clone();
     let mut vertex_vec = Vec::new();
+    let extent: LayerExtent = LayerExtent { MinX: f32::MAX, MaxX: f32::MIN, MinY: f32::MAX, MaxY: f32::MIN };
     debug!("Checking layer {}", layer_name);
     for feature in layer.features()
     {
@@ -226,7 +235,10 @@ pub fn get_depare_from_layer(layer: &mut gdal::vector::Layer) -> DEPARE {
                     debug!("Matched {new_geo_name}");
                     let points = new_geo.get_point_vec();
                     let num_points = points.len();
+                    
+                    // handle the points
                     let merc_points_2d: Vec<(f64, f64)> = points.iter().map(|x| (x.0, x.1)).map(|x| mercator_transform(x, merc_scale)).collect();
+
                     let poly = Polygon::new(LineString::from(merc_points_2d), vec![]);
                     let num_poly_points = poly.exterior().coords_count();
                     let polygon_vec = vec![poly];
@@ -258,14 +270,18 @@ pub fn get_depare_from_layer(layer: &mut gdal::vector::Layer) -> DEPARE {
             }
         }
     }
-    DEPARE { layers: depare_layers, vertices: vertex_vec}
+    let mut d = DEPARE { layers: depare_layers, vertices: vertex_vec, extent: extent };
+    d.sum_vertices();
+    let extent = get_vertices_extent(&d.vertices);
+    d.extent = extent;
+    d
 }
 
 #[derive(Clone, Debug)]
 pub struct DEPARE {
     pub layers: Vec<DepareLayer>,
     pub vertices: Vec<Vertex>,
-
+    pub extent: LayerExtent,
 }
 
 impl DEPARE {
@@ -424,13 +440,6 @@ fn does_envelope_collide(extent1: &LayerExtent, extent2: &LayerExtent) -> bool {
     debug!("COLLISION! {:?} collides with {:?}", extent1, extent2);
     true
 }
-#[derive(Debug)]
-pub struct LayerExtent {
-    pub MinX: f32,
-    pub MaxX: f32,
-    pub MinY: f32,
-    pub MaxY: f32,
-}
 
 pub fn get_vertices_extent(vertices: &Vec<Vertex>) -> LayerExtent {
     let mut min_x = f32::MAX;
@@ -459,13 +468,12 @@ pub fn get_vertices_extent(vertices: &Vec<Vertex>) -> LayerExtent {
 
 pub fn find_collisions(layer_map: &HashMap<String, LayerExtent>) -> Vec<Vec<String>> {
     let mut cols = Vec::new();
-    let mut layer_names = layer_map.keys().collect::<Vec<&String>>();
-    let mut o_names = layer_names.clone();
+    let layer_names = layer_map.keys().collect::<Vec<&String>>();
 
     let mut checked: Vec<String> = Vec::new();
     let mut stack: Vec<String> = Vec::new();
 
-    let mut to_check = o_names.clone();
+    let mut to_check = layer_names.clone();
     while to_check.len() >= 1 {
         let layer_name = to_check.pop().unwrap();
         if checked.contains(&layer_name) {
@@ -481,7 +489,7 @@ pub fn find_collisions(layer_map: &HashMap<String, LayerExtent>) -> Vec<Vec<Stri
             debug!("Stack = {:?}", stack.clone());
             let extent = layer_map.get(&layer_name).unwrap();
             let mut curr_collisions = Vec::new();
-            for other_layer in o_names.clone() {
+            for other_layer in layer_names.clone() {
                 if other_layer == &layer_name {
                     continue;
                 }
@@ -523,32 +531,34 @@ pub fn get_extent_area(extent: &LayerExtent) -> f32 {
     debug!("Getting area for {:?}", &extent);
     let x = extent.MaxX - extent.MinX;
     let y = extent.MaxY - extent.MinY;
-    x * y 
+    x.abs() * y.abs() 
 }
 
-pub fn get_hashmap_of_depare_layers(depare_layers: &mut Vec<(DEPARE, String)>) -> HashMap<u8, Vec<DEPARE>> {
+pub fn get_hashmap_of_depare_layers(depare_layers: &mut Vec<(DEPARE, String)>) -> HashMap<u16, Vec<DEPARE>> {
     // create map of datasets
-    let mut map: HashMap<u8, Vec<DEPARE>>  = HashMap::new();
+    let mut map: HashMap<u16, Vec<DEPARE>>  = HashMap::new();
     let depare_copy = depare_layers.clone();
     let mut name2extent: HashMap<String, LayerExtent> = HashMap::new();
     
     for (depare_layer, s) in depare_layers {
-        depare_layer.sum_vertices();
-        let extent = get_vertices_extent(&depare_layer.vertices);
-        name2extent.insert(s.clone(), extent);
+        name2extent.insert(s.clone(), depare_layer.extent.clone());
         }
     debug!("Looking at Map!");
     for k in name2extent.keys() {
         let v = name2extent.get(k).unwrap();
         debug!("{k}: {:?}", v);
     }
-    let mut layer_names = name2extent.keys().collect::<Vec<&String>>();
-
     // find collisions
     let collisions = find_collisions(&name2extent);
+    let mut total_cols = Vec::new();
+    for vc in collisions.clone() {
+        for c in vc {
+            total_cols.push(c.clone());
+        }
+    }
     debug!("Collisions: {:?}", collisions.clone()); 
     // sort collisions by area - maybe should make it more centroidy
-    let mut cntr = 0;
+    let mut cntr = 1;
     for col_vec in collisions {
         let mut sort_vec = col_vec.clone();
         debug!("Sorting {:?}", sort_vec.clone());
@@ -565,6 +575,14 @@ pub fn get_hashmap_of_depare_layers(depare_layers: &mut Vec<(DEPARE, String)>) -
             layer.0.clone()
         }).collect();
         map.insert(cntr, depare_vec);
-    } 
+        cntr += 1
+    }
+    let mut collision_free_vec = Vec::new();
+    for layer_name in depare_copy {
+        if !total_cols.contains(&layer_name.1) {
+            collision_free_vec.push(layer_name.0);
+        }
+    }
+    map.insert(0, collision_free_vec);
     map
 }
