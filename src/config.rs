@@ -32,13 +32,6 @@ pub fn get_layers() -> Vec<String> {
 
     // vec!["SEAARE"]
 }
-pub fn get_merc_scaling_size() -> (u32, u32) {
-    let c = get_config();
-    let merc_scaling_size_1 = c["merc_scaling_size_1"].as_integer().unwrap() as u32;
-    let merc_scaling_size_2 = c["merc_scaling_size_2"].as_integer().unwrap() as u32;
-    (merc_scaling_size_1, merc_scaling_size_2)
-    //   (1_000, 1_000)
-}
 
 pub fn get_color_for_layer(layer_name: &str) -> Color {
     let c = get_config();
