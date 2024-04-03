@@ -4,8 +4,8 @@ resolution_1 = 3840
 resolution_2 = 2400
 
 # Scaling size for mercator - doesn't really matter
-merc_scaling_size_1 = 3840
-merc_scaling_size_2 = 2400
+# merc_scaling_size_1 = 3840
+# merc_scaling_size_2 = 2400
 
 # Chart Path
 chart_directory = "./src/charts/"

@@ -14,7 +14,7 @@ use sfml::graphics::{Color, Font, RenderWindow, Vertex};
 use crate::transform::mercator_transform;
 use crate::render::{draw_vertex_vector, render_soundg};
 
-use crate::config::get_merc_scaling_size;
+use crate::config::get_resolution;
 
 use std::collections::HashMap;
 
@@ -119,7 +119,7 @@ pub fn triangles_from_scaled_polygons(polygons: &Vec<Polygon>) -> Triangles<f64>
 /// performs a mercator transform on all the geometries in a layer
 pub fn get_merc_polygons_from_layers(layers: &mut Vec<gdal::vector::Layer>) -> Vec<Polygon> {
     let mut polygons: Vec<Polygon> = Vec::new();
-    let merc_scale = get_merc_scaling_size();
+    let merc_scale = get_resolution();
     debug!("get_polygons_from_layers called! with {} layers", layers.len());
     for layer in layers {
         let layer_name = layer.name().clone();
@@ -179,7 +179,7 @@ fn get_color_for_depth(depth: f64) -> Color {
 
 pub fn get_depare_from_layer(layer: &mut gdal::vector::Layer) -> DEPARE {
     let mut depare_layers: Vec<DepareLayer> = Vec::new();
-    let merc_scale = get_merc_scaling_size();
+    let merc_scale = get_resolution();
     let layer_name = layer.name().clone();
     let mut vertex_vec = Vec::new();
     let extent: LayerExtent = LayerExtent { MinX: f32::MAX, MaxX: f32::MIN, MinY: f32::MAX, MaxY: f32::MIN };
@@ -321,7 +321,7 @@ pub struct DepthLayer {
 
 impl DepthLayer {
     pub fn project_coords(&mut self) {
-        let merc_scale = get_merc_scaling_size();
+        let merc_scale = get_resolution();
         let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
         for point in &self.coordinates {
             let merc_point = mercator_transform((point.0, point.1), merc_scale);

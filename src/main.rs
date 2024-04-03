@@ -2,7 +2,6 @@ use std::process::exit;
 
 use env_logger;
 
-//use log::info;
 use sfml::graphics::RenderTarget;
 use sfml::graphics::Color;
 use sfml::graphics::View;
@@ -24,6 +23,7 @@ use std::fs::read_dir;
 use crate::geometry::get_depare_from_layer;
 use crate::geometry::get_depare_layer;
 use crate::geometry::DepthLayer;
+use crate::render::get_zoom;
 use log::info;
 
 fn main() {
@@ -103,10 +103,17 @@ fn main() {
     let mut window = create_window();
     let mut view = View::new((resolution.0 as f32 / 2 as f32, resolution.1 as f32 / 2 as f32).into(), (resolution.0 as f32, resolution.1 as f32).into());
     window.set_view(&view);
+    let (center, zoom_scalar) = get_zoom(&map, &view);
+    window.set_view(&view);
     let mut zoom = 1.0 as f32;
     let res_x = resolution.0 as f32;
     let res_y = resolution.1 as f32;
-    
+    let mid_x = res_x / 2.0;
+    let mid_y = res_y / 2.0;
+    info!("center: {:?}", center);
+    view.move_((center.0 - mid_x, center.1 - mid_y));
+    view.zoom(1.0 / zoom_scalar);
+    zoom /= zoom_scalar;
     let mut render_depth = false;
     loop {
         while let Some(event) = window.wait_event() {
@@ -138,10 +145,12 @@ fn main() {
                 Event::KeyPressed { code: Key::W, ..} => {
                     zoom *= 0.9;
                     view.zoom(0.9);
+                    info!("view: {:?}", view.size());
                 }
                 Event::KeyPressed { code: Key::S, ..} => {
                     zoom *= 1.1;
                     view.zoom(1.1);
+                    info!("view: {:?}", view.size());
                 }
                 Event::KeyPressed { code: Key::D, ..} => {
                     render_depth = !render_depth;
@@ -149,6 +158,7 @@ fn main() {
                 _ => {}
             }
         window.clear(Color::BLACK);
+
         render_objects(&mut window, &plot_refs);
 
         for key in map.keys() {
@@ -156,9 +166,7 @@ fn main() {
             for depare in layers {
                 depare.render(&mut window)
             }
-
-        }
-        
+        }       
         if render_depth {
             //render_objects(&mut window, &projections);
             for projection in projections.iter() {
