@@ -2,9 +2,9 @@ use std::process::exit;
 
 use env_logger;
 
-use log::info;
 use sfml::graphics::RenderTarget;
 use sfml::graphics::Color;
+use sfml::graphics::View;
 use sfml::window::Event;
 use sfml::window::Key;
 
@@ -13,24 +13,21 @@ mod geometry;
 mod config;
 mod render;
 
-use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords, get_extent_from_layers_in_ds};
-use config::{get_color_for_layer, get_resolution, get_layers, get_chart_directory, get_init_tl_br};
+use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords, DEPARE, Plotable, get_hashmap_of_depare_layers};
+use config::{get_color_for_layer, get_resolution, get_layers, get_chart_directory};
 use render::{create_window, render_objects};
 
 use gdal::Dataset;
 
 use std::fs::read_dir;
-
+use crate::geometry::get_depare_from_layer;
+use crate::geometry::get_depare_layer;
 use crate::geometry::DepthLayer;
-// use log::debug;
+use crate::render::get_zoom;
+use log::info;
 
 fn main() {
     env_logger::init();
-    // get the extent from the config
-    //let (mut top_left_extent, mut bottom_right_extent) = get_init_tl_br();
-    let mut top_left_extent = (f64::MIN, f64::MIN);
-    let mut bottom_right_extent = (f64::MAX, f64::MAX);
-
     // get depth layer
     // print depth soundings
  
@@ -43,7 +40,8 @@ fn main() {
     let chart_dir = read_dir(chart_config_dir).unwrap();
     
     let mut plot_refs: Vec<PlotGeometry> = Vec::new();
-    let depth_plots: Vec<DepthLayer> = Vec::new();
+    let mut depth_plots: Vec<DepthLayer> = Vec::new();
+    let mut projections: Vec<DepthLayer> = Vec::new();
 
     let mut paths: Vec<String> = Vec::new();
 
@@ -55,52 +53,68 @@ fn main() {
         paths.push(path.to_string());
 
     }
-    let datasets: Vec<Dataset> = paths.iter().map(|path| get_dataset(path)).collect();
-    for ds in datasets {
-        //let mut soundg = get_soundg_layer(&ds);
-        //let depth_sounding = get_soundg_coords(&mut soundg, (top_left_extent, bottom_right_extent));
-        //depth_plots.push(epth_sounding);
-        // update extent if layer's extent is smaller or larger
-        let (br, tl) = get_extent_from_layers_in_ds(&layer_names, &ds);
-        info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
-        if tl.0 > top_left_extent.0 {
-            top_left_extent.0 = tl.0;
-            info!("Updating top left extent lon to {:.5}", top_left_extent.0);
-            info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
+    let mut datasets: Vec<(Dataset, String)> = Vec::new();
+    for path in paths {
+        let ds = get_dataset(&path);
+        match ds {
+            Ok(ds) => datasets.push((ds, path)),
+            _ => continue,
         }
-        if tl.1 > top_left_extent.1 {
-            top_left_extent.1 = tl.1;
-            info!("Updating top left extent lat to {:.5}", top_left_extent.1);
-            info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
-        }
-        if br.0 < bottom_right_extent.0 {
-            bottom_right_extent.0 = br.0;
-            info!("Updating bottom right extent lon to {:.5}", bottom_right_extent.0);
-            info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
-        }
-        if br.1 < bottom_right_extent.1 {
-            bottom_right_extent.1 = br.1;
-            info!("Updating bottom right extent lat to {:.5}", bottom_right_extent.1);
-            info!("Top left exent: {:?} Bottom right extent: {:?}", top_left_extent, bottom_right_extent);
-        }
+    }
+    //let datasets: Vec<Dataset> = paths.iter().map(|path| get_dataset(path)).map(|ds| ds.unwrapor
+    let mut resolve_depare = Vec::new();
+    for (ds, p) in datasets {
         for layer_name in &layer_names {
             let layer_color = get_color_for_layer(&layer_name[..]);
             let plotgeo = get_plotgeo_from_layer_in_dataset(layer_name, &ds, layer_color);
             plotvec.push(plotgeo);
         }
-    }
+        let soundg = get_soundg_layer(&ds);
+        let mut soundg_layer = match soundg {
+            Some(soundg) => soundg,
+            _ => continue,
+        };
+        let depth_sounding = get_soundg_coords(&mut soundg_layer);
+        depth_plots.push(depth_sounding);
+        // update extent if layer's extent is smaller or larger
+        let mut depare_layer = match get_depare_layer(&ds) {
+            Some(depare) => depare,
+            _ => continue,
+        };
+        let depare: DEPARE = get_depare_from_layer(&mut depare_layer);
+        resolve_depare.push((depare, p.clone()));
+        }
+
+    info!("Handling DEPARE RESOLVING!");
+    let map = get_hashmap_of_depare_layers(&mut resolve_depare);
+    info!("map: {:?}", map.keys());
+
+
     for mut pg in plotvec {
-    pg.triangulate_and_scale(top_left_extent, bottom_right_extent);
+    pg.triangulate_and_scale();
     plot_refs.push(pg);
     }
-    //plot_refs.push(&soundg;
+    for mut ds in depth_plots {
+        ds.project_coords();
+        projections.push(ds);
+    }
     // set up window and zoom
     println!("Creating Window!");
-    let mut viewvec = (0.0 as f32, 0.0 as f32);
     let mut window = create_window();
+    let mut view = View::new((resolution.0 as f32 / 2 as f32, resolution.1 as f32 / 2 as f32).into(), (resolution.0 as f32, resolution.1 as f32).into());
+    window.set_view(&view);
+    let (center, zoom_scalar) = get_zoom(&map, &view);
+    window.set_view(&view);
     let mut zoom = 1.0 as f32;
-    let zoom_scalar_x = resolution.0 as f32 / 10 as f32;
-    let zoom_scalar_y = resolution.1 as f32 / 10 as f32;
+    let res_x = resolution.0 as f32;
+    let res_y = resolution.1 as f32;
+    let mid_x = res_x / 2.0;
+    let mid_y = res_y / 2.0;
+    info!("center: {:?}", center);
+    view.move_((center.0 - mid_x, center.1 - mid_y));
+    view.zoom(1.0 / zoom_scalar);
+    zoom /= zoom_scalar;
+    let mut render_depth = false;
     loop {
         while let Some(event) = window.wait_event() {
             match event {
@@ -112,29 +126,54 @@ fn main() {
                     window.close();
                     exit(0);
                 }
+                Event::KeyPressed { code: Key::Q, ..} => {
+                    window.close();
+                    exit(0);
+                }
                 Event::KeyPressed { code: Key::Up, ..} => {
-                    viewvec.1 += 1 as f32 / zoom as f32 * zoom_scalar_y;
+                    view.move_((0 as f32, -0.1 * res_y * zoom as f32 ));
                 }
                 Event::KeyPressed { code: Key::Down, ..} => {
-                    viewvec.1 -= 1 as f32 / zoom as f32 * zoom_scalar_y;
+                    view.move_((0 as f32, 0.1  * res_y * zoom as f32 ));
                 }
                 Event::KeyPressed { code: Key::Left, ..} => {
-                    viewvec.0 += 1 as f32 / zoom as f32 * zoom_scalar_x;
+                    view.move_((-0.1 * (res_x * zoom) as f32, 0 as f32));
                 }
                 Event::KeyPressed { code: Key::Right, ..} => {
-                    viewvec.0 -= 1 as f32 / zoom as f32 * zoom_scalar_x;
+                    view.move_((0.1 * (res_x * zoom) as f32 , 0 as f32));
                 }
                 Event::KeyPressed { code: Key::W, ..} => {
-                    zoom *= 1.1;
+                    zoom *= 0.9;
+                    view.zoom(0.9);
+                    info!("view: {:?}", view.size());
                 }
                 Event::KeyPressed { code: Key::S, ..} => {
-                    zoom *= 0.9;
+                    zoom *= 1.1;
+                    view.zoom(1.1);
+                    info!("view: {:?}", view.size());
+                }
+                Event::KeyPressed { code: Key::D, ..} => {
+                    render_depth = !render_depth;
                 }
                 _ => {}
             }
         window.clear(Color::BLACK);
-        render_objects(&mut window, &plot_refs, zoom, resolution, viewvec);
-        render_objects(&mut window, &depth_plots, zoom, resolution, viewvec);
+
+        render_objects(&mut window, &plot_refs);
+
+        for key in map.keys() {
+            let layers = map.get(key).unwrap();
+            for depare in layers {
+                depare.render(&mut window)
+            }
+        }       
+        if render_depth {
+            //render_objects(&mut window, &projections);
+            for projection in projections.iter() {
+                render::render_soundg(&mut window, projection, &projection.font, zoom);
+            }
+        }
+        window.set_view(&view);
         window.display();
         }
     }

@@ -1,10 +1,11 @@
 # Resolution of our program
-resolution_1 = 1000
-resolution_2 = 1000
+# 3840x2400
+resolution_1 = 3840
+resolution_2 = 2400
 
 # Scaling size for mercator - doesn't really matter
-merc_scaling_size_1 = 1000
-merc_scaling_size_2 = 1000
+# merc_scaling_size_1 = 3840
+# merc_scaling_size_2 = 2400
 
 # Chart Path
 chart_directory = "./src/charts/"
@@ -16,14 +17,18 @@ bottom_right_2 = 30.1
 
 # Layer information
 # note we can map colors like color = [r, g, b] or [r, g, b, a]
-layers = ['LNDARE', 'SEAARE', 'DEPARE', 'DEPCNT']
+layers = ['LNDARE', 'SEAARE', 'DEPARE']
+#layers = ['DEPARE']
+#layers = ['SEAARE']
 
 [SEAARE]
-color = "blue"
+color = [115,182,239]
 [LNDARE]
-color= "green"
+color= [201,185,122]
 [DEPARE]
-color = "blue"
+#color = "blue"
+color = [115,182,239]
 [DEPCNT]
-color = 'cyan'
+color = [212,234,238,255]
+#color = 'cyan'
 
