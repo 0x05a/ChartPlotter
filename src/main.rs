@@ -74,7 +74,7 @@ fn main() {
             Some(soundg) => soundg,
             _ => continue,
         };
-        let depth_sounding = get_soundg_coords(&mut soundg_layer);
+        let depth_sounding: DepthLayer = get_soundg_coords(&mut soundg_layer);
         depth_plots.push(depth_sounding);
         // update extent if layer's extent is smaller or larger
         let mut depare_layer = match get_depare_layer(&ds) {
@@ -145,12 +145,10 @@ fn main() {
                 Event::KeyPressed { code: Key::W, ..} => {
                     zoom *= 0.9;
                     view.zoom(0.9);
-                    info!("view: {:?}", view.size());
                 }
                 Event::KeyPressed { code: Key::S, ..} => {
                     zoom *= 1.1;
                     view.zoom(1.1);
-                    info!("view: {:?}", view.size());
                 }
                 Event::KeyPressed { code: Key::D, ..} => {
                     render_depth = !render_depth;
@@ -159,18 +157,18 @@ fn main() {
             }
         window.clear(Color::BLACK);
 
-        render_objects(&mut window, &plot_refs);
+        render_objects(&mut window, &plot_refs, &view);
 
         for key in map.keys() {
             let layers = map.get(key).unwrap();
             for depare in layers {
-                depare.render(&mut window)
+                depare.render(&mut window, &view)
             }
         }       
         if render_depth {
             //render_objects(&mut window, &projections);
             for projection in projections.iter() {
-                render::render_soundg(&mut window, projection, &projection.font, zoom);
+                render::render_soundg(&mut window, projection, &projection.font, zoom, &view);
             }
         }
         window.set_view(&view);

@@ -1,10 +1,10 @@
 use sfml::graphics::{Color, Font, PrimitiveType, RenderStates, RenderTarget, RenderWindow, Transformable, Vertex, View};
 use sfml::window::Style;
-use log::debug;
+use log::{debug, info};
 use sfml::SfBox;
 
 use crate::config;
-use crate::geometry::{DepthLayer, LayerExtent, Plotable, DEPARE};
+use crate::geometry::{does_extent_collide, get_extent_area, DepthLayer, LayerExtent, Plotable, DEPARE};
 
 use std::collections::HashMap;
 
@@ -16,11 +16,11 @@ pub fn create_window() -> RenderWindow {
 
 }
 
-pub fn render_objects<T: Plotable>(window: &mut RenderWindow, plotvec: &Vec<T>) {
+pub fn render_objects<T: Plotable>(window: &mut RenderWindow, plotvec: &Vec<T>, window_view: &SfBox<View>) {
 
         // render code
         for plot in plotvec {
-            plot.render(window)
+            plot.render(window, window_view)
         }
 }
 
@@ -29,14 +29,42 @@ pub fn render_objects<T: Plotable>(window: &mut RenderWindow, plotvec: &Vec<T>) 
 //    window.draw(vertex_buffer);
 //}
 
-pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>) {
+pub fn is_extent_in_view(view: &View, extent: &LayerExtent) -> bool {
+    // if the extent is not in the view then return false
+    let view_center = view.center();
+    let view_size = view.size();
+    let view_extent = LayerExtent{MinX: view_center.x - view_size.x / 2.0, MaxX: view_center.x + view_size.x / 2.0, MinY: view_center.y - view_size.y / 2.0, MaxY: view_center.y + view_size.y / 2.0};
+    // info!("Checking if extent {:?} is in view {:?}", extent, view_extent);
+    does_extent_collide(&view_extent, extent)
+}
+
+pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>, vertex_extent: &LayerExtent, view: &SfBox<View>) {
+    if !is_extent_in_view(view, vertex_extent) {
+        info!("Extent not in view!");
+        return;
+    }
     window.draw_primitives(vertices, PrimitiveType::TRIANGLES, &RenderStates::default());
 
 }
 
-pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer,  font: &SfBox<Font>, scale: f32) {
+pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer,  font: &SfBox<Font>, scale: f32, view: &SfBox<View>) {
+    let view_extent = LayerExtent{MinX: view.center().x - view.size().x / 2.0, MaxX: view.center().x + view.size().x / 2.0, MinY: view.center().y - view.size().y / 2.0, MaxY: view.center().y + view.size().y / 2.0};
+    if !does_extent_collide(&view_extent, &depth_soundings.extent) {
+        info!("Extent not in view!");
+        return;
+    }
+    let view_area = get_extent_area( &view_extent);
+    let soundg_area = get_extent_area(&depth_soundings.extent);
+
+    let soundg_scale = view_area / soundg_area;
+    log::info!("Soundg scale: {}", soundg_scale);
+    if soundg_scale > 10.0 {
+        return;
+    }
+
+
     for sounding in &depth_soundings.coordinates {
-        let mut text = sfml::graphics::Text::new(&format!("{:.1}", sounding.2 * 3.281), &font, 8);
+        let mut text = sfml::graphics::Text::new(&format!("{:.0}", sounding.2 * 3.281), &font, 8);
         
         let pos = (sounding.0 as f32, sounding.1 as f32);
         

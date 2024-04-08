@@ -9,7 +9,8 @@ use geo::triangulate_spade::Triangles;
 use geo::{Polygon, LineString, TriangulateEarcut, CoordsIter};
 
 use log::{debug, info, warn};
-use sfml::graphics::{Color, Font, RenderWindow, Vertex};
+use sfml::graphics::{Color, Font, RenderWindow, Vertex, View};
+use sfml::{window, SfBox};
 
 use crate::transform::mercator_transform;
 use crate::render::{draw_vertex_vector, render_soundg};
@@ -19,7 +20,7 @@ use crate::config::get_resolution;
 use std::collections::HashMap;
 
 pub trait Plotable {
-    fn render(&self, window: &mut RenderWindow) -> ();
+    fn render(&self, window: &mut RenderWindow, window_view: &SfBox<View>) -> ();
 
 }
 pub struct PlotGeometry{
@@ -28,15 +29,17 @@ pub struct PlotGeometry{
     pub color: sfml::graphics::Color,
     pub layer_name: String,
     pub vertex_vec: Vec<Vertex>,
+    pub extent: LayerExtent,
 }
 impl PlotGeometry {
-    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String, vertex_vec: Vec<Vertex>) -> PlotGeometry {
+    pub fn new(polygons: Vec<Polygon>, triangles: Triangles<f64>, color: sfml::graphics::Color, layer_name: String, vertex_vec: Vec<Vertex>, extent: LayerExtent) -> PlotGeometry {
         PlotGeometry {
             polygons,
             triangles,
             color,
             layer_name,
             vertex_vec,
+            extent
         }
     }
     pub fn triangulate_and_scale(&mut self) {
@@ -48,15 +51,16 @@ impl PlotGeometry {
             vertex_vec.push(Vertex::with_pos_color((triangle.2.x as f32, triangle.2.y as f32).into(), self.color));
         }
         self.vertex_vec = vertex_vec;
+        self.extent = get_vertices_extent(&self.vertex_vec);
     }
 }
 
 impl Plotable for PlotGeometry {
-    fn render(&self, window: &mut RenderWindow) {
-        draw_vertex_vector(window, &self.vertex_vec)
+    fn render(&self, window: &mut RenderWindow, window_view: &SfBox<View>) {
+        draw_vertex_vector(window, &self.vertex_vec, &self.extent, window_view)
     }
 }
-
+#[allow(non_snake_case)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayerExtent {
     pub MinX: f32,
@@ -65,12 +69,20 @@ pub struct LayerExtent {
     pub MaxY: f32,
 }
 
+impl LayerExtent {
+    pub fn new(MinX: f32, MaxX: f32, MinY: f32, MaxY: f32) -> LayerExtent {
+        LayerExtent { MinX, MaxX, MinY, MaxY }
+    }
+    pub fn default() -> LayerExtent {
+        LayerExtent { MinX: f32::MAX, MaxX: f32::MIN, MinY: f32::MAX, MaxY: f32::MIN }
+    }
+}
 // creates a PlotGeometry from a layer name - still needs to be triangulated and scaled
 pub fn get_plotgeo_from_layer_in_dataset(layer_name: &String, ds: & Dataset, color: sfml::graphics::Color) -> PlotGeometry {
     let mut layers = get_layers(&ds, vec![&layer_name[..]]);
     let polygons = get_merc_polygons_from_layers(&mut layers);
     let triangles = Triangles::new();
-    PlotGeometry::new(polygons, triangles, color, layer_name.clone(), Vec::new())
+    PlotGeometry::new(polygons, triangles, color, layer_name.clone(), Vec::new(), LayerExtent::default())
 }
 
 pub fn get_dataset(path: &str) -> Result<Dataset, gdal::errors::GdalError>{
@@ -295,8 +307,8 @@ impl DEPARE {
 }
 
 impl Plotable for DEPARE {
-    fn render(&self, window: &mut RenderWindow) -> () {
-        draw_vertex_vector(window, &self.vertices)
+    fn render(&self, window: &mut RenderWindow, view: &SfBox<View>) -> () {
+        draw_vertex_vector(window, &self.vertices, &self.extent, view)
     }
 }
 #[derive(Clone, Debug)]
@@ -317,15 +329,34 @@ pub struct DepthLayer {
     pub font: sfml::SfBox<Font>,
     pub longitude_scale: (f64, f64),
     pub latitude_scale: (f64, f64),
+    pub extent: LayerExtent,
 }
 
 impl DepthLayer {
     pub fn project_coords(&mut self) {
         let merc_scale = get_resolution();
         let mut final_points: Vec<(f64, f64, f64)> = Vec::new();
+        let mut min_x = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut min_y = f64::MAX;
+        let mut max_y = f64::MIN;
+
         for point in &self.coordinates {
             let merc_point = mercator_transform((point.0, point.1), merc_scale);
             let (x, y) = merc_point;
+            if  x < min_x {
+                min_x = x;
+            }
+            if x > max_x {
+                max_x = x;
+            }
+            if y < min_y {
+                min_y = y;
+            }
+            if y > max_y {
+                max_y = y;
+            }
+
             final_points.push((x, y, point.2));
             if x < self.longitude_scale.0 {
                 self.longitude_scale.0 = x;
@@ -341,12 +372,13 @@ impl DepthLayer {
             }
         }
         self.coordinates = final_points;
+        self.extent = LayerExtent { MinX: min_x as f32, MaxX: max_x as f32, MinY: min_y as f32, MaxY: max_y as f32 };
     }
 }
 
 impl Plotable for DepthLayer {
-    fn render(&self, window: &mut RenderWindow) -> () {
-        render_soundg(window, self, &self.font, 0.0 as f32)
+    fn render(&self, window: &mut RenderWindow, view: &SfBox<View>) -> () {
+        render_soundg(window, self, &self.font, 0.0 as f32, view)
     }
     
 }
@@ -403,7 +435,7 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer) -> DepthLayer {
             }
         }
     }
-    DepthLayer { coordinates: final_points, font: get_default_font(), longitude_scale: (f64::MAX, f64::MIN), latitude_scale: (f64::MAX, f64::MIN)} 
+    DepthLayer { coordinates: final_points, font: get_default_font(), longitude_scale: (f64::MAX, f64::MIN), latitude_scale: (f64::MAX, f64::MIN), extent: LayerExtent::default()} 
 } 
 
 
@@ -412,32 +444,32 @@ pub fn get_default_font() -> sfml::SfBox<Font> {
     Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap() 
 }
 
-fn does_envelope_collide(extent1: &LayerExtent, extent2: &LayerExtent) -> bool {
+pub fn does_extent_collide(extent1: &LayerExtent, extent2: &LayerExtent) -> bool {
     // return true if envelope 2 collides with envelope 1
     // if e2 is higher than e1
     // need to check this function
-    debug!("Checking if {:?} collides with {:?}", extent1, extent2);
+    //debug!("Checking if {:?} collides with {:?}", extent1, extent2);
     // if e2 is above e1
     if extent2.MinY > extent1.MaxY {
-        debug!("No collision! {:?} is above {:?}", extent2, extent1);
+        //debug!("No collision! {:?} is above {:?}", extent2, extent1);
         return false
     }
     // if e2 is lower than e1
     if extent2.MaxY < extent1.MinY {
-        debug!("No collision! {:?} is below {:?}", extent2, extent1);
+        //debug!("No collision! {:?} is below {:?}", extent2, extent1);
         return false
     }
     if extent2.MaxX < extent1.MinX {
     // if e2 is to the left of e1
-        debug!("No collision! {:?} is to the left of {:?}", extent2, extent1);
+        //debug!("No collision! {:?} is to the left of {:?}", extent2, extent1);
         return false
     }
     if extent2.MinX > extent1.MaxX {
     // if e2 is to the right of e1
-        debug!("No collision! {:?} is to the right of {:?}", extent2, extent1);
+        //debug!("No collision! {:?} is to the right of {:?}", extent2, extent1);
         return false
     }
-    debug!("COLLISION! {:?} collides with {:?}", extent1, extent2);
+    // debug!("COLLISION! {:?} collides with {:?}", extent1, extent2);
     true
 }
 
@@ -499,7 +531,7 @@ pub fn find_collisions(layer_map: &HashMap<String, LayerExtent>) -> Vec<Vec<Stri
 
                 let other_extent = layer_map.get(other_layer).unwrap();
                 debug!("Checking if {} and {} collide", &layer_name, &other_layer);
-                if does_envelope_collide(&extent, &other_extent) {
+                if does_extent_collide(&extent, &other_extent) {
                     curr_collisions.push(other_layer.clone());
                     if !collisions.contains(&layer_name) {
                         collisions.push(layer_name.clone());
@@ -575,7 +607,7 @@ pub fn get_hashmap_of_depare_layers(depare_layers: &mut Vec<(DEPARE, String)>) -
             layer.0.clone()
         }).collect();
         map.insert(cntr, depare_vec);
-        cntr += 1
+        cntr += 1;
     }
     let mut collision_free_vec = Vec::new();
     for layer_name in depare_copy {
