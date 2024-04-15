@@ -9,14 +9,15 @@ chart_directory = "./src/charts/"
 
 # Layer information
 # note we can map colors like color = [r, g, b] or [r, g, b, a]
-layers = ['LNDARE', 'SEAARE', 'DEPARE']
+layers = ['FAIRWY', 'LNDARE']
 
 [SEAARE]
 color = [115,182,239]
 [LNDARE]
-color= [201,185,122]
+color = [201,185,122]
 [DEPARE]
 color = [115,182,239]
 [DEPCNT]
 color = [212,234,238,255]
-
+[FAIRWY]
+color = [212, 234, 238]

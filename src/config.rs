@@ -10,7 +10,6 @@ pub fn get_config() -> Table {
     let mut contents = String::new();
     file.read_to_string(&mut contents).expect("Couldn't read config.toml");
     let config: Table = toml::from_str(&contents).expect("Couldn't parse config.toml");
-    // dbg!(&config);
     config
 }
 pub fn get_resolution() -> (u32, u32) {
@@ -18,7 +17,6 @@ pub fn get_resolution() -> (u32, u32) {
     let res1 = c["resolution_1"].as_integer().unwrap() as u32;
     let res2 = c["resolution_2"].as_integer().unwrap() as u32;
     (res1, res2)
-    //(1000, 1000)
 }
 
 pub fn get_layers() -> Vec<String> {
@@ -29,8 +27,6 @@ pub fn get_layers() -> Vec<String> {
         layers_vec.push(layer.as_str().unwrap().to_string());
     }
     layers_vec
-
-    // vec!["SEAARE"]
 }
 
 pub fn get_color_for_layer(layer_name: &str) -> Color {
@@ -81,7 +77,6 @@ pub fn get_color_for_layer(layer_name: &str) -> Color {
         }
     };
     color
-    // (255, 255, 255)
 }
 
 pub fn get_chart_directory() -> String {
