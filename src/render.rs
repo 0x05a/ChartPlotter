@@ -1,10 +1,10 @@
-use sfml::graphics::{Color, Font, PrimitiveType, RenderStates, RenderTarget, RenderWindow, Transformable, Vertex, View};
+use sfml::graphics::{CircleShape, Color, Font, PrimitiveType, RenderStates, RenderTarget, RenderWindow, Shape, Transformable, Vertex, View};
 use sfml::window::Style;
-use log::{debug, info};
+use log::debug;
 use sfml::SfBox;
 
 use crate::config;
-use crate::geometry::{does_extent_collide, get_extent_area, DepthLayer, LayerExtent, Plotable, DEPARE};
+use crate::geometry::{does_extent_collide, get_extent_area, BuoyLayer, DepthLayer, LayerExtent, Plotable, DEPARE};
 
 use std::collections::HashMap;
 
@@ -40,7 +40,7 @@ pub fn is_extent_in_view(view: &View, extent: &LayerExtent) -> bool {
 
 pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>, vertex_extent: &LayerExtent, view: &SfBox<View>) {
     if !is_extent_in_view(view, vertex_extent) {
-        info!("Extent not in view!");
+        // info!("Extent not in view!");
         return;
     }
     window.draw_primitives(vertices, PrimitiveType::TRIANGLES, &RenderStates::default());
@@ -50,14 +50,14 @@ pub fn draw_vertex_vector(window: &mut RenderWindow, vertices: &Vec<Vertex>, ver
 pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer,  font: &SfBox<Font>, scale: f32, view: &SfBox<View>) {
     let view_extent = LayerExtent{MinX: view.center().x - view.size().x / 2.0, MaxX: view.center().x + view.size().x / 2.0, MinY: view.center().y - view.size().y / 2.0, MaxY: view.center().y + view.size().y / 2.0};
     if !does_extent_collide(&view_extent, &depth_soundings.extent) {
-        info!("Extent not in view!");
+        // info!("Extent not in view!");
         return;
     }
     let view_area = get_extent_area( &view_extent);
     let soundg_area = get_extent_area(&depth_soundings.extent);
 
     let soundg_scale = view_area / soundg_area;
-    log::info!("Soundg scale: {}", soundg_scale);
+    // log::info!("Soundg scale: {}", soundg_scale);
     if soundg_scale > 10.0 {
         return;
     }
@@ -75,6 +75,30 @@ pub fn render_soundg(window: &mut RenderWindow, depth_soundings: &DepthLayer,  f
     }
 }
 
+pub fn render_buoy(window: &mut RenderWindow, buoy: &BuoyLayer, scale: f32, view: &SfBox<View>) {
+    let view_extent = LayerExtent{MinX: view.center().x - view.size().x / 2.0, MaxX: view.center().x + view.size().x / 2.0, MinY: view.center().y - view.size().y / 2.0, MaxY: view.center().y + view.size().y / 2.0};
+    //info!("View extent: {:?}", view_extent);
+    //info!("Buoy extent: {:?}", buoy.extent);
+    //if !does_extent_collide(&view_extent, &buoy.extent) {
+        //info!("Extent not in view!");
+        //return;
+    //}
+    let view_area = get_extent_area( &view_extent);
+    let buoy_area = get_extent_area(&buoy.extent);
+
+    let buoy_scale = view_area / buoy_area;
+    // log::info!("Buoy scale: {}", buoy_scale);
+    if buoy_scale > 40.0 {
+        return;
+    }
+    for vertex in &buoy.vertices {
+        
+        let mut buoy_circle = CircleShape::new(5.0 * scale, 30); 
+        buoy_circle.set_position(vertex.position);
+        buoy_circle.set_fill_color(vertex.color);
+        window.draw(&buoy_circle);
+    }
+}
 pub fn get_zoom(map: &HashMap<u16, Vec<DEPARE>>, view: &SfBox<View>) -> ((f32, f32), f32) {
     let mut extents = Vec::new();
     for (_, depares) in map {

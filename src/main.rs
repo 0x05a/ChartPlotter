@@ -13,7 +13,7 @@ mod geometry;
 mod config;
 mod render;
 
-use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords, DEPARE, Plotable, get_hashmap_of_depare_layers};
+use geometry::{get_plotgeo_from_layer_in_dataset, PlotGeometry, get_dataset, get_soundg_layer, get_soundg_coords, DEPARE, Plotable, get_hashmap_of_depare_layers, get_buoy_data};
 use config::{get_color_for_layer, get_resolution, get_layers, get_chart_directory};
 use render::{create_window, render_objects};
 
@@ -42,6 +42,7 @@ fn main() {
     let mut plot_refs: Vec<PlotGeometry> = Vec::new();
     let mut depth_plots: Vec<DepthLayer> = Vec::new();
     let mut projections: Vec<DepthLayer> = Vec::new();
+    let mut buoys = Vec::new();
 
     let mut paths: Vec<String> = Vec::new();
 
@@ -61,7 +62,6 @@ fn main() {
             _ => continue,
         }
     }
-    //let datasets: Vec<Dataset> = paths.iter().map(|path| get_dataset(path)).map(|ds| ds.unwrapor
     let mut resolve_depare = Vec::new();
     for (ds, p) in datasets {
         for layer_name in &layer_names {
@@ -83,7 +83,14 @@ fn main() {
         };
         let depare: DEPARE = get_depare_from_layer(&mut depare_layer);
         resolve_depare.push((depare, p.clone()));
+        
+        let buoy_layers = geometry::get_layers(&ds, Vec::from(["BOYCAR", "BOYINB", "BOYISD", "BOYLAT", "BOYSAW", "BOYSPP", "BCNLAT"]));
+        for mut buoy_layer in buoy_layers {
+            let buoy_data = get_buoy_data(&mut buoy_layer, resolution);
+            info!("ADDED BUOY!");
+            buoys.push(buoy_data);
         }
+    }
 
     info!("Handling DEPARE RESOLVING!");
     let map = get_hashmap_of_depare_layers(&mut resolve_depare);
@@ -156,20 +163,25 @@ fn main() {
                 _ => {}
             }
         window.clear(Color::BLACK);
+        
 
         render_objects(&mut window, &plot_refs, &view);
-
+        
         for key in map.keys() {
             let layers = map.get(key).unwrap();
             for depare in layers {
                 depare.render(&mut window, &view)
             }
         }       
+
         if render_depth {
             //render_objects(&mut window, &projections);
             for projection in projections.iter() {
                 render::render_soundg(&mut window, projection, &projection.font, zoom, &view);
             }
+        }
+        for buoy in buoys.iter() {
+            render::render_buoy(&mut window, buoy, zoom, &view);
         }
         window.set_view(&view);
         window.display();

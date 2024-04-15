@@ -2,8 +2,7 @@ use std::f64::consts::PI;
 
 pub fn mercator_transform(coord: (f64, f64), scale: (u32, u32)) -> (f64, f64)
 {
-    let lon = coord.0;
-    let lat = coord.1;
+    let (lon, lat ) = coord;
     //debug!("Transforming lon: {}, lat: {}", lon, lat);
     let (width, height) = scale;
 

@@ -10,7 +10,8 @@ use geo::{Polygon, LineString, TriangulateEarcut, CoordsIter};
 
 use log::{debug, info, warn};
 use sfml::graphics::{Color, Font, RenderWindow, Vertex, View};
-use sfml::{window, SfBox};
+use sfml::system::Vector2f;
+use sfml::SfBox;
 
 use crate::transform::mercator_transform;
 use crate::render::{draw_vertex_vector, render_soundg};
@@ -70,9 +71,6 @@ pub struct LayerExtent {
 }
 
 impl LayerExtent {
-    pub fn new(MinX: f32, MaxX: f32, MinY: f32, MaxY: f32) -> LayerExtent {
-        LayerExtent { MinX, MaxX, MinY, MaxY }
-    }
     pub fn default() -> LayerExtent {
         LayerExtent { MinX: f32::MAX, MaxX: f32::MIN, MinY: f32::MAX, MaxY: f32::MIN }
     }
@@ -330,6 +328,11 @@ pub struct DepthLayer {
     pub longitude_scale: (f64, f64),
     pub latitude_scale: (f64, f64),
     pub extent: LayerExtent,
+    pub color: Option<Color>,
+}
+pub struct BuoyLayer {
+    pub vertices: Vec<Vertex>,
+    pub extent: LayerExtent,
 }
 
 impl DepthLayer {
@@ -435,7 +438,7 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer) -> DepthLayer {
             }
         }
     }
-    DepthLayer { coordinates: final_points, font: get_default_font(), longitude_scale: (f64::MAX, f64::MIN), latitude_scale: (f64::MAX, f64::MIN), extent: LayerExtent::default()} 
+    DepthLayer { coordinates: final_points, font: get_default_font(), longitude_scale: (f64::MAX, f64::MIN), latitude_scale: (f64::MAX, f64::MIN), extent: LayerExtent::default(), color: None} 
 } 
 
 
@@ -443,6 +446,71 @@ pub fn get_soundg_coords(soundg_layer: &mut Layer) -> DepthLayer {
 pub fn get_default_font() -> sfml::SfBox<Font> {
     Font::from_file("./src/fonts/OpenSans-Regular.ttf").unwrap() 
 }
+
+pub fn get_buoy_data(layer: &mut Layer, scale: (u32, u32)) -> BuoyLayer {
+    let mut final_points: Vec<Vertex> = Vec::new();
+    #[allow(unused_assignments)]
+    let mut color = Color::BLACK;
+    for feature in layer.features() {
+        let color_map = HashMap::from([(1, Color::WHITE), (3, Color::RED), (4, Color::GREEN), (5, Color::BLUE), (6, Color::YELLOW)]);
+        let point =  match feature.geometry().unwrap().get_point_vec().pop() {
+            Some(point) => point,
+            None => {
+                warn!("No point found in BUOY layer!");
+                continue;
+            }
+        };
+        let merc_point = mercator_transform((point.0, point.1), scale);
+        
+        let color_value =  match feature.field_as_string_by_name("COLOUR") {
+            Ok(val) => {
+                match val {
+                    Some(val) => val,
+                    None => {
+                        warn!("No COLOUR field found in BUOY layer!");
+                        continue;
+                    }
+                }
+            }
+            Err(_) => {
+                warn!("No COLOUR field found in BUOY layer!");
+                continue;
+            }
+        };
+        let first_digit_of_string = color_value.chars().next().unwrap();
+        let color_value =  match first_digit_of_string {
+            '(' => 
+            {
+                let color_value = color_value.trim_matches(|c| c == '(' || c == ')');
+                let c_v =  match color_value.chars().rev().next() 
+                {
+                    Some(c) => c.to_digit(10).unwrap_or(50),
+                    None => 
+                    {
+                        warn!("No color found for value {} in COLOUR field!", color_value);
+                        continue;
+                    }
+                };
+                c_v
+            } 
+            _ => {
+                warn!("No color found for value {} in COLOUR field!", color_value);
+                continue;
+            }
+        };
+
+        color = match color_map.get(&color_value) {
+            Some(color) => color.clone(),
+            None => {
+                warn!("No color found for value {} in COLOUR map!", color_value);
+                continue;
+            }
+        };
+        final_points.push(Vertex::with_pos_color(Vector2f::from((merc_point.0 as f32, merc_point.1 as f32)), color));
+    }
+    let extent = get_vertices_extent(&final_points);
+    BuoyLayer { vertices: final_points, extent: extent}
+    }
 
 pub fn does_extent_collide(extent1: &LayerExtent, extent2: &LayerExtent) -> bool {
     // return true if envelope 2 collides with envelope 1
@@ -560,7 +628,7 @@ pub fn find_collisions(layer_map: &HashMap<String, LayerExtent>) -> Vec<Vec<Stri
 }
 
 pub fn get_extent_area(extent: &LayerExtent) -> f32 {
-    debug!("Getting area for {:?}", &extent);
+    //debug!("Getting area for {:?}", &extent);
     let x = extent.MaxX - extent.MinX;
     let y = extent.MaxY - extent.MinY;
     x.abs() * y.abs() 
